@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta content="width=device-width, initial-scale=1" name="viewport">
+	<title>Interesting Data Review</title>
+	<link href="/static/css/bootstrap.min.css" rel="stylesheet">
+	<script src="/static/js/htmx.min.js"></script>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+	<div class="container-fluid">
+		<a class="navbar-brand" href="/">Home</a>
+		<button aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation"
+				class="navbar-toggler"
+				data-bs-target="#navbarNavDropdown" data-bs-toggle="collapse" type="button">
+			<span class="navbar-toggler-icon"></span>
+		</button>
+        {{/*Only show the review link if the user has admin, review_bow, or review_interesting user roles.*/}}
+        {{$hasAdminRole := false}}
+        {{$hasReviewBowRole := false}}
+        {{$hasReviewInterestingRole := false}}
+        {{range .UserRoles}}
+        {{if or (eq . "admin")}}
+        {{$hasAdminRole = true}}
+        {{end}}
+        {{if eq . "review_bow"}}
+        {{$hasReviewBowRole = true}}
+        {{end}}
+        {{if eq . "review_interesting"}}
+        {{$hasReviewInterestingRole = true}}
+        {{end}}
+        {{end}}
+        {{if or $hasAdminRole $hasReviewBowRole $hasReviewInterestingRole}}
+		<div class="collapse navbar-collapse" id="navbarNavDropdown">
+			<ul class="navbar-nav">
+				<li class="nav-item dropdown">
+                    {{/*Show the review link if the user has admin, review_bow, or review_interesting user roles.*/}}
+					<a aria-expanded="false" class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#"
+					   id="navbarDropdownMenuLink" role="button">
+						Review
+					</a>
+					<ul aria-labelledby="navbarDropdownMenuLink" class="dropdown-menu">
+                        {{/*Only show the review interesting link if the user has admin or review_interesting user
+                        roles*/}}
+                        {{if or $hasAdminRole $hasReviewInterestingRole}}
+						<li><a class="dropdown-item" href="/review/interesting">Interesting</a></li>
+                        {{end}}
+                        {{/*Only show the review bag of words link if the user has admin or review_bow user roles*/}}
+                        {{if or $hasAdminRole $hasReviewBowRole}}
+						<li><a class="dropdown-item" href="/review/bag-of-words">Bag-of-words</a></li>
+                        {{end}}
+					</ul>
+				</li>
+			</ul>
+		</div>
+        {{end}}
+	</div>
+</nav>
+<div class="container">
+	<div class="row">
+		<div class="col-12">
+			<h1>Interesting Data Review</h1>
+		</div>
+		<div class="row">
+			<div class="col">
+                {{/*Show button links to every bag of words type (0 - 3, inclusive)*/}}
+				<a {{if eq .BagOfWordsType 0}}class="btn btn-primary" href="#" {{else}}class="btn btn-outline-primary"
+				   href="/review/bag-of-words?type=0" {{end}}>Parameter Keys</a>
+				<a {{if eq .BagOfWordsType 1}}class="btn btn-primary" href="#" {{else}}class="btn btn-outline-primary"
+				   href="/review/bag-of-words?type=1" {{end}}>Header Keys</a>
+				<a {{if eq .BagOfWordsType 2}}class="btn btn-primary" href="#" {{else}}class="btn btn-outline-primary"
+				   href="/review/bag-of-words?type=2"{{end}}>Server Values</a>
+				<a {{if eq .BagOfWordsType 3}}class="btn btn-primary" href="#" {{else}}class="btn btn-outline-primary"
+				   href="/review/bag-of-words?type=3" {{end}}>Cookie Keys</a>
+			</div>
+		</div>
+		<div class="col-12 text-center m-auto">
+			<table class="table table-bordered">
+				<thead>
+				<tr>
+					<th>Value</th>
+					<th>Count</th>
+					<th>Flag</th>
+					<th>Action</th>
+				</tr>
+				</thead>
+				<tbody id="bow-tbody">
+                {{block "bagOfWordsValues" .BagOfWords}}
+                {{range $id, $word := .}}
+				<tr id="row{{$id}}">
+					<td>{{$word.Name}}</td>
+					<td>{{$word.Count}}</td>
+					<td>
+						<input class="form-check-input" type="checkbox">
+					</td>
+					<td>
+						<button class="btn btn-danger toggle-delete" data-row="row{{$id}}">Delete</button>
+					</td>
+				</tr>
+                {{end}}
+                {{end}}
+				</tbody>
+			</table>
+		</div>
+		<div class="col-12 m-auto">
+			<button class="btn btn-primary" type="button"
+					hx-post="/review/bag-of-words?type={{printf "%d" .BagOfWordsType}}"
+					hx-target="#bow-tbody"
+					hx-vals='js:{keep:bowKeepValues(),remove:bowRemoveValues(),flagged:bowFlaggedValues(),unflagged:bowUnflaggedValues()}'>
+				Submit & Next
+			</button>
+		</div>
+	</div>
+</div>
+
+<script>
+    // Keep all values where the row isn't set to be deleted.
+    function bowKeepValues() {
+        let keepIndices = [];
+        let rows = document.querySelectorAll('tbody tr:not(.table-danger)');
+        rows.forEach(row => {
+            let id = row.getAttribute('id');
+            let index = id.replace("row", "");
+            keepIndices.push(index);
+        });
+        return keepIndices;
+    }
+
+    // Remove all values where the row is set to be deleted.
+    function bowRemoveValues() {
+        let removeIndices = [];
+        let rows = document.querySelectorAll('tbody tr.table-danger');
+        rows.forEach(row => {
+            let id = row.getAttribute('id');
+            let index = id.replace("row", "");
+            removeIndices.push(index);
+        });
+        return removeIndices;
+    }
+
+    // Flag all values where the "Flag" checkbox is checked.
+    function bowFlaggedValues() {
+        let flagIndices = [];
+        let rows = document.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            let checkbox = row.querySelector('.form-check-input');
+            if (checkbox.checked) {
+                let id = row.getAttribute('id');
+                let index = id.replace("row", "");
+                flagIndices.push(index);
+            }
+        });
+        return flagIndices;
+    }
+
+    // Return all unflagged values where the "Flag" checkbox is unchecked.
+    function bowUnflaggedValues() {
+        let unflaggedIndices = [];
+        let rows = document.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            let checkbox = row.querySelector('.form-check-input');
+            if (!checkbox.checked) {
+                let id = row.getAttribute('id');
+                let index = id.replace("row", "");
+                unflaggedIndices.push(index);
+            }
+        });
+        return unflaggedIndices;
+    }
+
+    // Make the "Delete" button toggle the "table-danger" class on the row.
+    document.addEventListener('click', function (e) {
+        if (e.target && e.target.classList.contains('toggle-delete')) {
+            e.preventDefault();
+            let rowId = e.target.dataset.row;
+            document.getElementById(rowId).classList.toggle('table-danger');
+        }
+    });
+
+</script>
+
+<!-- Bootstrap -->
+<script src="/static/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
