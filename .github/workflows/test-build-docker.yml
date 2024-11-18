@@ -1,0 +1,31 @@
+name: Test Build Cartograph
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**/node_modules/**"
+      - "docs/**"
+      - "LICENSE"
+      - "README.md"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: listendev/action@v0.11
+      with:
+        jwt: ${{ secrets.LISTEN_DEV_API_KEY }}
+        ci: only
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+
+    - name: Build and run Docker Compose
+      run: |
+        docker compose up --build -d
+        sleep 10
+        docker compose down
